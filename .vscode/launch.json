@@ -1,0 +1,64 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug rustre",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rustre",
+                    "--package=rustre"
+                ],
+                "filter": {
+                    "name": "rustre",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=rustre"
+                ],
+                "filter": {
+                    "name": "rustre",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration tests",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=integration_tests",
+                    "--package=rustre"
+                ],
+                "filter": {
+                    "name": "integration_tests",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
