@@ -1,6 +1,6 @@
 [package]
 name = "rustre"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [[bin]]
@@ -23,7 +23,7 @@ env_logger = "0.11"
 
 [dev-dependencies]
 tempfile = "3.20"
-zip = { version = "5.1", features = ["deflate", "bzip2", "time", "aes-crypto"] }
+zip = { version = "6.0.0", features = ["deflate", "bzip2", "time", "aes-crypto"] }
 aes = "0.8"
 cbc = "0.1"
 pbkdf2 = "0.12"

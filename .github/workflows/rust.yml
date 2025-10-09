@@ -1,16 +1,29 @@
-name: Build RustRE
+name: Build and Release Rustre
 
 on:
   push:
     branches:
       - master
+    tags:
+      - 'v*'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
 
 jobs:
-  release:
-    name: Release - ${{ matrix.platform.release_for }}
+  build:
+    name: Build - ${{ matrix.platform.os_name }}
     strategy:
       matrix:
         platform:
@@ -21,6 +34,7 @@ jobs:
           - os_name: macOS-x86_64
             os: macOS-latest
             target: x86_64-apple-darwin
+            command: "build"
           - os_name: Linux-x86_64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
@@ -29,7 +43,7 @@ jobs:
     runs-on: ${{ matrix.platform.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build
         uses: houseabsolute/actions-rust-cross@v0
@@ -38,11 +52,48 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--release"
 
-      - name: Upload
+      - name: Package Release (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        run: |
+          mkdir package
+          cp target/${{ matrix.platform.target }}/release/rustre.exe package/
+          cp rust_versions.json package/
+          cd package
+          7z a ../rustre-${{ matrix.platform.target }}.zip *
+
+      - name: Package Release (Unix)
+        if: matrix.platform.os != 'windows-latest'
+        run: |
+          mkdir -p package
+          cp target/${{ matrix.platform.target }}/release/rustre package/
+          cp rust_versions.json package/
+          tar -czf rustre-${{ matrix.platform.target }}.tar.gz -C package .
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: rustre-${{ matrix.platform.target }}
           path: |
-            target/${{ matrix.platform.target }}/release/rustre*
-            !target/${{ matrix.platform.target }}/release/rustre.pdb
-            !target/${{ matrix.platform.target }}/release/rustre.d
+            rustre-${{ matrix.platform.target }}.*
+
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
