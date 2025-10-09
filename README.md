@@ -1,81 +1,53 @@
-# 🔍 Rustre - Rust Binary Forensics Tool
+# 🔍 Rustre — Rust Binary Inspector
 
-> **Uncover the secrets hidden in Rust binaries** - Extract dependencies, source paths, and compiler versions from compiled Rust executables
+Analyze compiled Rust executables and print a clear JSON report.
 
-## ✨ What Makes This Special
+## ✨ Features
+- 📦 Extracts crate names and versions found in the binary (from embedded Cargo registry paths)
+- 🧭 Lists source paths found inside the binary (separates framework vs user paths)
+- 🧬 Detects the embedded rustc commit hash and maps it to a Rust version (using `rust_versions.json`)
+- 🖨️ Outputs structured JSON to stdout
+- 🖥️ Works with typical Linux ELF and Windows PE binaries (no disassembly; pure byte scan)
 
-🕵️ **Reverse Engineering Made Easy** - Analyze Rust malware and binaries to understand their composition  
-📦 **Dependency Detective** - Extract exact crate versions used in compilation  
-🔗 **Source Path Leakage** - Discover leaked developer paths (goldmine for malware analysis)  
-🦀 **Rust Version Fingerprinting** - Map compiler hashes to exact Rust versions  
-🌐 **Cross-Platform** - Works on both Linux ELF and Windows PE binaries  
+## 🚀 Quick start
+### Download a prebuilt release (easiest)
+- Go to this repository's Releases page and download the archive for your platform:
+  - `x86_64-unknown-linux-gnu` (Linux)
+  - `x86_64-apple-darwin` (macOS)
+  - `x86_64-pc-windows-msvc` (Windows)
+- Extract the archive. It contains the `rustre`/`rustre.exe` binary and `rust_versions.json`.
+- Run it:
+  - Linux/macOS: `./rustre path/to/binary`
+  - Windows: `rustre.exe path\to\binary`
 
-## 🚀 Quick Start
-
+### Build from source
 ```bash
-# Build and run
 cargo build --release
 ./target/release/rustre path/to/binary
-
-# That's it! Get instant insights about any Rust binary
 ```
 
-## 📊 What You'll Get
-
+The tool prints a JSON object like:
 ```json
 {
-  "packages": [
-    { "name": "tokio", "version": "1.25.0" },
-    { "name": "serde", "version": "1.0.152" }
-  ],
-  "user_source_paths": [
-    "/home/attacker/malware/src/main.rs"  // 🎯 Jackpot!
-  ],
-  "framework_source_paths": [
-    "/std/src/path.rs"
-  ],
-  "rust_version": "1.69.0"
+  "packages": [ { "path": ".../tokio-1.0.0", "name": "tokio", "version": "1.0.0" } ],
+  "framework_source_paths": ["/std/..."],
+  "user_source_paths": ["/home/.../src/main.rs"],
+  "rustc_hash": "<40-hex>",
+  "rust_version": "<resolved version or null>"
 }
 ```
 
-## 🎯 Perfect For
-
-- **🔐 Security Researchers** - Analyze Rust malware and suspicious binaries
-- **📝 Forensic Analysts** - Extract compilation artifacts and source intelligence  
-- **🐛 Reverse Engineers** - Understand binary composition and dependencies
-- **🔍 Threat Hunters** - Fingerprint Rust-based threats
-
-## 💡 Why This Matters
-
-Most binary analysis tools ignore Rust-specific artifacts. **Rustre** extracts the goldmine of information that Rust compilers accidentally embed:
-
-- **Developer machine paths** (often leaked in binaries)
-- **Exact dependency versions** (crucial for vulnerability analysis)
-- **Compilation environment details** (helps profile attackers)
-- **Framework vs custom code separation** (focus your analysis)
-
-## 🧪 Battle-Tested
-
-Tested against real-world Rust malware samples including:
-- Simple command-line tools
-- Complex GUI applications  
-- Sophisticated malware with 20+ dependencies
-- Both Linux and Windows executables
-
-## 🏗️ Architecture
-
+## 🔄 Update the Rust version database (optional)
+`rust_versions.json` maps rustc commit hashes to released versions. To refresh it from GitHub:
+```bash
+./target/release/rustre --update-versions
 ```
-rustre/
-├── src/lib.rs          # 🧠 Core analysis engine
-├── src/main.rs         # 🖥️  CLI interface
-├── tests/              # 🧪 Real malware samples
-└── tools/              # 🔧 Helper utilities
-```
+This writes a new `rust_versions.json` in the current directory.
 
-## 🤝 Contributing
+## Notes
+- Offline by default; no network calls during analysis.
+- `rust_versions.json` must be readable from the current working directory to resolve versions. If it’s missing, the JSON field `rust_version` will be `null` (the hash is still shown when present).
+- Heuristic approach: results depend on what the compiler embedded; some binaries may expose more or fewer details.
 
-Found an interesting binary that breaks the tool? Have ideas for new features? PRs welcome!
-
----
-
-*Built with 🦀 Rust | Perfect for 🔍 Binary Analysis | Loved by 🕵️ Security Researchers* 
+## License
+See `LICENSE.txt`.
