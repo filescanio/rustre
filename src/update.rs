@@ -20,13 +20,15 @@ async fn fetch_github_tags(owner: &str, repo: &str) -> Result<Vec<GitHubTag>, Bo
     let mut page = 1;
     
     loop {
-        let url = format!("https://api.github.com/repos/{}/{}/tags", owner, repo);
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/tags?per_page=100&page={}",
+            owner, repo, page
+        );
         
         info!("Fetching page {}...", page);
         
         let response = client
             .get(&url)
-            .query(&[("per_page", "100"), ("page", &page.to_string())])
             .header("User-Agent", "rustre")
             .send()
             .await?;
