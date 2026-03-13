@@ -5,6 +5,7 @@ use serde::Serialize;
 use serde_json::from_str;
 use log::{warn, debug};
 
+pub mod pe_strings;
 pub mod update;
 
 #[derive(PartialEq, Eq, Hash, Serialize, Debug, Clone)]
@@ -14,6 +15,8 @@ pub struct Package {
     pub version: String
 }
 
+pub const DEFAULT_MIN_STR_LEN: usize = 4;
+
 #[derive(Serialize, Debug, Clone)]
 pub struct AnalysisResult {
     pub packages: Vec<Package>,
@@ -21,6 +24,7 @@ pub struct AnalysisResult {
     pub user_source_paths: HashSet<String>,
     pub rustc_hash: Option<String>,
     pub rust_version: Option<String>,
+    pub language_strings: Vec<pe_strings::ExtractedString>,
 }
 
 pub fn load_version_mappings() -> Option<HashMap<String, String>> {
@@ -135,32 +139,29 @@ fn resolve_rust_version(rustc_hash: &Option<String>, version_mappings: &Option<H
     }
 }
 
-pub fn analyze_binary(file_path: &str) -> Result<AnalysisResult, Box<dyn std::error::Error>> {
+pub fn analyze_binary(file_path: &str, min_length: usize) -> Result<AnalysisResult, Box<dyn std::error::Error>> {
     debug!("Starting analysis of binary: {}", file_path);
     
     let content = fs::read(file_path)?;
     debug!("Read {} bytes from binary", content.len());
     
-    // Load version mappings
     let version_mappings = load_version_mappings();
-    
-    // Extract packages
     let packages = extract_packages(&content)?;
-    
-    // Extract rustc information
     let rustc_hash = extract_rustc_info(&content)?;
-    
-    // Categorize paths
     let (framework_paths, user_paths) = categorize_paths(&content)?;
-    
-    // Resolve Rust version
     let rust_version = resolve_rust_version(&rustc_hash, &version_mappings);
-    
-    // Convert packages HashSet to Vec for JSON serialization
     let packages_vec: Vec<Package> = packages.into_iter().collect();
+
+    let language_strings = if pe_strings::is_pe(&content) {
+        debug!("PE detected, extracting language strings");
+        pe_strings::extract_rust_strings(&content, min_length)
+    } else {
+        debug!("not a PE, skipping language string extraction");
+        Vec::new()
+    };
     
-    debug!("Analysis complete: {} packages, rustc_hash: {:?}, rust_version: {:?}", 
-           packages_vec.len(), rustc_hash, rust_version);
+    debug!("Analysis complete: {} packages, {} language strings, rustc_hash: {:?}, rust_version: {:?}", 
+           packages_vec.len(), language_strings.len(), rustc_hash, rust_version);
     
     Ok(AnalysisResult {
         packages: packages_vec,
@@ -168,5 +169,6 @@ pub fn analyze_binary(file_path: &str) -> Result<AnalysisResult, Box<dyn std::er
         user_source_paths: user_paths,
         rustc_hash,
         rust_version,
+        language_strings,
     })
 } 

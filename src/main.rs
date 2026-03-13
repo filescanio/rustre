@@ -2,7 +2,7 @@ use std::process;
 use clap::Parser;
 use serde_json::to_string_pretty;
 use log::{error, info};
-use rustre::analyze_binary;
+use rustre::{analyze_binary, DEFAULT_MIN_STR_LEN};
 use rustre::update::update_rust_versions;
 
 #[derive(Parser)]
@@ -12,6 +12,10 @@ struct Args {
     #[arg(required_unless_present = "update_versions")]
     file_path: Option<String>,
     
+    /// Minimum string length for PE language string extraction
+    #[arg(short = 'n', long = "min-length", default_value_t = DEFAULT_MIN_STR_LEN)]
+    min_length: usize,
+
     /// Update the Rust versions database from GitHub
     #[arg(long, help = "Update the Rust versions database from GitHub API")]
     update_versions: bool,
@@ -37,7 +41,7 @@ async fn main() {
         }
     } else if let Some(file_path) = args.file_path {
         // Analyze the binary file
-        match analyze_binary(&file_path) {
+        match analyze_binary(&file_path, args.min_length) {
             Ok(result) => {
                 if let Ok(json) = to_string_pretty(&result) {
                     println!("{}", json);

@@ -4,7 +4,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use tempfile::TempDir;
 use zip::ZipArchive;
-use rustre::{analyze_binary, load_version_mappings, Package};
+use rustre::{analyze_binary, load_version_mappings, Package, DEFAULT_MIN_STR_LEN};
 
 /// Helper function to extract a password-protected zip file and return the path to the extracted binary
 fn extract_sample(zip_name: &str) -> (TempDir, PathBuf) {
@@ -38,9 +38,8 @@ fn test_sample_005f7884f04fd8be032c875a714a6413933d6cebcda2b4fb06de2f88a42bb089_
     
     // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
-    // Test expected packages
     let expected_packages = vec![
         Package { path: "/cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-demangle-0.1.21".to_string(), name: "rustc-demangle".to_string(), version: "0.1.21".to_string() },
         Package { path: "/cargo/registry/src/index.crates.io-6f17d22bba15001f/gimli-0.26.2".to_string(), name: "gimli".to_string(), version: "0.26.2".to_string() },
@@ -48,20 +47,17 @@ fn test_sample_005f7884f04fd8be032c875a714a6413933d6cebcda2b4fb06de2f88a42bb089_
         Package { path: "/cargo/registry/src/index.crates.io-6f17d22bba15001f/addr2line-0.17.0".to_string(), name: "addr2line".to_string(), version: "0.17.0".to_string() },
     ];
     
-    // Check that all expected packages are present
     for expected_pkg in expected_packages {
         assert!(result.packages.contains(&expected_pkg), "Missing package: {:?}", expected_pkg);
     }
     
-    // Test user source paths (should be empty for malware samples)
     assert!(result.user_source_paths.is_empty(), "User source paths should be empty");
-    
-    // Test rustc hash and version
     assert_eq!(result.rustc_hash, Some("84c898d65adf2f39a5a98507f1fe0ce10a2b8dbc".to_string()));
     assert_eq!(result.rust_version, Some("1.69.0".to_string()));
-    
-    // Test that we have packages
     assert!(!result.packages.is_empty(), "Packages list should not be empty");
+
+    // ELF: no PE language string extraction
+    assert!(result.language_strings.is_empty());
 }
 
 #[test]
@@ -70,9 +66,8 @@ fn test_sample_42b0897474819a5d21de10488fdc539eea10b96d6e0679d9836bd4c6b40875aa_
     
     // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
-    // Test expected packages
     let expected_packages = vec![
         Package { path: "/cargo/registry/src/index.crates.io-6f17d22bba15001f/addr2line-0.17.0".to_string(), name: "addr2line".to_string(), version: "0.17.0".to_string() },
         Package { path: "/cargo/registry/src/index.crates.io-6f17d22bba15001f/miniz_oxide-0.5.3".to_string(), name: "miniz_oxide".to_string(), version: "0.5.3".to_string() },
@@ -88,15 +83,15 @@ fn test_sample_42b0897474819a5d21de10488fdc539eea10b96d6e0679d9836bd4c6b40875aa_
     assert_eq!(result.rustc_hash, Some("84c898d65adf2f39a5a98507f1fe0ce10a2b8dbc".to_string()));
     assert_eq!(result.rust_version, Some("1.69.0".to_string()));
     assert!(!result.packages.is_empty());
+    assert!(result.language_strings.is_empty());
 }
 
 #[test]
 fn test_sample_5255ea080acd85ad274c48d1c4254c285c24f5ea67787666005c9a47c62ceb70_elf() {
     let filename = "5255ea080acd85ad274c48d1c4254c285c24f5ea67787666005c9a47c62ceb70.elf";
     
-    // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
     let expected_packages = vec![
         Package { path: "/cargo/registry/src/index.crates.io-6f17d22bba15001f/addr2line-0.17.0".to_string(), name: "addr2line".to_string(), version: "0.17.0".to_string() },
@@ -113,6 +108,7 @@ fn test_sample_5255ea080acd85ad274c48d1c4254c285c24f5ea67787666005c9a47c62ceb70_
     assert_eq!(result.rustc_hash, Some("84c898d65adf2f39a5a98507f1fe0ce10a2b8dbc".to_string()));
     assert_eq!(result.rust_version, Some("1.69.0".to_string()));
     assert!(!result.packages.is_empty());
+    assert!(result.language_strings.is_empty());
 }
 
 #[test]
@@ -121,28 +117,25 @@ fn test_sample_c18b24be70e5227a6b383c94034210b85c809fba8eca7a06b8b2136d510efee5_
     
     // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
-    // This should have similar pattern to other ELF files
     assert!(result.user_source_paths.is_empty());
     assert_eq!(result.rustc_hash, Some("84c898d65adf2f39a5a98507f1fe0ce10a2b8dbc".to_string()));
     assert_eq!(result.rust_version, Some("1.69.0".to_string()));
     assert!(!result.packages.is_empty());
     
-    // Should contain common packages found in Rust binaries
     let has_rustc_demangle = result.packages.iter().any(|p| p.name == "rustc-demangle");
     assert!(has_rustc_demangle, "Should contain rustc-demangle package");
+    assert!(result.language_strings.is_empty());
 }
 
 #[test]
 fn test_sample_855f411bd0667b650c4f2fd3c9fbb4fa9209cf40b0d655fa9304dcdd956e0808_exe() {
     let filename = "855f411bd0667b650c4f2fd3c9fbb4fa9209cf40b0d655fa9304dcdd956e0808.exe";
     
-    // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
-    // Test expected packages for Windows executable
     let expected_packages = vec![
         Package { path: ".cargo\\registry\\src\\github.com-1ecc6299db9ec823\\winsafe-0.0.12".to_string(), name: "winsafe".to_string(), version: "0.0.12".to_string() },
         Package { path: ".cargo\\registry\\src\\github.com-1ecc6299db9ec823\\rand_core-0.5.1".to_string(), name: "rand_core".to_string(), version: "0.5.1".to_string() },
@@ -159,15 +152,17 @@ fn test_sample_855f411bd0667b650c4f2fd3c9fbb4fa9209cf40b0d655fa9304dcdd956e0808_
     assert_eq!(result.rustc_hash, Some("4b91a6ea7258a947e59c6522cd5898e7c0a6a88f".to_string()));
     assert_eq!(result.rust_version, Some("1.63.0".to_string()));
     assert!(!result.packages.is_empty());
+
+    // PE: should have extracted language strings from .rdata
+    assert!(!result.language_strings.is_empty(), "PE should have language strings");
 }
 
 #[test]
 fn test_sample_acc31048e00d1a0f4cd5569d5d4db539da8f506cc7a6a171942d015ecc817d43_exe() {
     let filename = "acc31048e00d1a0f4cd5569d5d4db539da8f506cc7a6a171942d015ecc817d43.exe";
     
-    // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
     let expected_packages = vec![
         Package { path: ".cargo\\registry\\src\\github.com-1ecc6299db9ec823\\winsafe-0.0.12".to_string(), name: "winsafe".to_string(), version: "0.0.12".to_string() },
@@ -185,17 +180,16 @@ fn test_sample_acc31048e00d1a0f4cd5569d5d4db539da8f506cc7a6a171942d015ecc817d43_
     assert_eq!(result.rustc_hash, Some("4b91a6ea7258a947e59c6522cd5898e7c0a6a88f".to_string()));
     assert_eq!(result.rust_version, Some("1.63.0".to_string()));
     assert!(!result.packages.is_empty());
+    assert!(!result.language_strings.is_empty(), "PE should have language strings");
 }
 
 #[test]
 fn test_sample_6d337b95ca3361f5fc5733591095765beab6917555777f078eafea3064f735bd_exe() {
     let filename = "6d337b95ca3361f5fc5733591095765beab6917555777f078eafea3064f735bd.exe";
     
-    // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
-    // This file contains user source paths (malware with source code traces)
     let expected_user_paths = vec![
         "/src/peparser/pe.rs".to_string(),
         "/src/peloader/winapi.rs".to_string(),
@@ -216,34 +210,32 @@ fn test_sample_6d337b95ca3361f5fc5733591095765beab6917555777f078eafea3064f735bd_
     assert_eq!(result.rust_version, Some("1.85.1".to_string()));
     assert!(!result.packages.is_empty(), "Should have packages");
     
-    // Should contain expected packages for this sample
     let has_native_windows_gui = result.packages.iter().any(|p| p.name == "native-windows-gui");
     assert!(has_native_windows_gui, "Should contain native-windows-gui package");
+    assert!(!result.language_strings.is_empty(), "PE should have language strings");
 }
 
 #[test]
 fn test_sample_8ac509a776a326180877dc44636081e21f58c89431477ef2a38db10ad6bd15d1_exe() {
     let filename = "8ac509a776a326180877dc44636081e21f58c89431477ef2a38db10ad6bd15d1.exe";
     
-    // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
     assert!(result.user_source_paths.is_empty());
     assert!(result.rustc_hash.is_some());
     assert!(result.rust_version.is_some());
     assert!(!result.packages.is_empty());
+    assert!(!result.language_strings.is_empty(), "PE should have language strings");
 }
 
 #[test]
 fn test_sample_8765ef2a4575e52195223ecb045be569c08337e1ff73a894214b0644f7b480ba_exe() {
     let filename = "8765ef2a4575e52195223ecb045be569c08337e1ff73a894214b0644f7b480ba.exe";
     
-    // Extract from password-protected zip
     let (_temp_dir, file_path) = extract_sample(&format!("{}.zip", filename));
-    let result = analyze_binary(file_path.to_str().unwrap()).unwrap();
+    let result = analyze_binary(file_path.to_str().unwrap(), DEFAULT_MIN_STR_LEN).unwrap();
     
-    // This file contains user source paths (malware with source code traces) 
     let expected_user_paths = vec![
         "/src/ui.rs".to_string(),
         "/src/main.rs".to_string(),
@@ -257,9 +249,8 @@ fn test_sample_8765ef2a4575e52195223ecb045be569c08337e1ff73a894214b0644f7b480ba_
     assert_eq!(result.rustc_hash, Some("9fc6b43126469e3858e2fe86cafb4f0fd5068869".to_string()));
     assert_eq!(result.rust_version, Some("1.84.0".to_string()));
     assert!(!result.packages.is_empty());
-    
-    // Should contain many packages due to GUI dependencies
     assert!(result.packages.len() > 20, "Should have many packages due to complex dependencies");
+    assert!(!result.language_strings.is_empty(), "PE should have language strings");
 }
 
 #[test]
@@ -279,7 +270,7 @@ fn test_version_mappings_functionality() {
 #[test]
 fn test_analyze_binary_error_handling() {
     // Test with non-existent file
-    let result = analyze_binary("non_existent_file.bin");
+    let result = analyze_binary("non_existent_file.bin", DEFAULT_MIN_STR_LEN);
     assert!(result.is_err(), "Should return error for non-existent file");
 }
 
